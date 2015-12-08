@@ -1,5 +1,5 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean
 
 Base = declarative_base()
 
@@ -18,3 +18,4 @@ class Transfer(Base):
     key = Column(String)
     path = Column(String)
     progress = Column(Integer)
+    started = Column(Boolean, default=False)

@@ -17,4 +17,18 @@ if not os.path.exists(db_url):
 from models import Transfer
 from sqlalchemy.orm import sessionmaker
 Session = sessionmaker(bind=engine)
-session = Session()
+
+from contextlib import contextmanager
+
+@contextmanager
+def session():
+    """Provide a transactional scope around a series of operations."""
+    s = Session()
+    try:
+        yield s
+        s.commit()
+    except:
+        s.rollback()
+        raise
+    finally:
+        s.close()

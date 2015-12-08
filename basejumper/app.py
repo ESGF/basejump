@@ -17,11 +17,13 @@ def job_progress(key):
         Find the specified job
         Return the progress
     """
-    for t in session.query(Transfer).filter(Transfer.key == key):
-        progress = t.progress
-        break
-    else:
-        raise ValueError("Invalid key %s provided" % key)
+    with session() as s:
+        for t in s.query(Transfer).filter(Transfer.key == key):
+            progress = t.progress
+            break
+        else:
+            raise ValueError("Invalid key %s provided" % key)
+        s.close()
     return jsonify({"progress": progress, "key":key})
 
 
@@ -50,18 +52,16 @@ def queue_job(path=None):
     key = datastream.file_key(path)
     if not key:
         raise ValueError("File %s not found." % (path))
-    # Check if already queued
-    for t in session.query(Transfer).filter(Transfer.path == path):
-        # Check if there's an existing transfer for this file
-        break
-    else:
-        # Queue in DB using path
-        t = Transfer(path=path, key=key, progress=0)
-        session.add(t)
-        session.commit()
+
+    with session() as s:
+        # Check if already queued
+        for t in s.query(Transfer).filter(Transfer.path == path):
+            # Check if there's an existing transfer for this file
+            break
+        else:
+            # Queue in DB using path
+            t = Transfer(path=path, key=key, progress=0)
+            s.add(t)
+            s.commit()
 
     return jsonify({"key": key, "progress": "/progress/%s" % key})
-
-if __name__ == "__main__":
-    app.debug = True
-    app.run()
