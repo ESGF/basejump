@@ -1,11 +1,28 @@
 from flask import Flask, request, jsonify
 from addons import querykeys
 from mock import datastream
+from db import Transfer, session
 app = Flask(__name__)
+
 
 @app.route("/")
 def main():
-    return "Nothing to see here..."
+    return "BASEJumper Alpha"
+
+
+@app.route("/progress/<key>")
+def job_progress(key):
+    """
+    /progress/hashed_path_with_key ->
+        Find the specified job
+        Return the progress
+    """
+    for t in session.query(Transfer).filter(Transfer.key == key):
+        progress = t.progress
+        break
+    else:
+        raise ValueError("Invalid key %s provided" % key)
+    return jsonify({"progress": progress, "key":key})
 
 
 @app.route("/queue")
@@ -33,9 +50,16 @@ def queue_job(path=None):
     key = datastream.file_key(path)
     if not key:
         raise ValueError("File %s not found." % (path))
-    # Queue in DB using key
-    # TODO: Implement
-    pass
+    # Check if already queued
+    for t in session.query(Transfer).filter(Transfer.path == path):
+        # Check if there's an existing transfer for this file
+        break
+    else:
+        # Queue in DB using path
+        t = Transfer(path=path, key=key, progress=0)
+        session.add(t)
+        session.commit()
+
     return jsonify({"key": key, "progress": "/progress/%s" % key})
 
 if __name__ == "__main__":
