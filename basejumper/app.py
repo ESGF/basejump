@@ -30,12 +30,12 @@ def queue_job(path=None):
     pass
     # Check File Exists, retrieve key
     ### We should use a secret key in generating this key
-    ### Should we also use a credential-associated key?
     key = datastream.file_key(path)
     if not key:
         raise ValueError("File %s not found." % (path))
-    # Queue in DB
+    # Queue in DB using key
     # TODO: Implement
+    pass
     return jsonify({"key": key, "progress": "/progress/%s" % key})
 
 if __name__ == "__main__":

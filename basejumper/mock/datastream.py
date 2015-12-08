@@ -18,6 +18,7 @@ def stream_file(path):
         r = random.random() * tape_delay
         time.sleep(r)
         yield d
+        # TODO: Update DB progress for this key
 
 
 def get_file(path):
@@ -28,9 +29,14 @@ def get_file(path):
 
 
 def file_key(path):
+    """
+    Determines if file exists (returns None if it does not) and generates the
+    key used for referring to the file in the DB
+    """
     if path is None:
         return None
     hasher = hashlib.md5()
     hasher.update(path)
+    # TODO: Should use a secret key to prevent simple attack vectors
     key = hasher.hexdigest()
     return key
