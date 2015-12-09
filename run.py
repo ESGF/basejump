@@ -1,7 +1,9 @@
 #!/usr/bin/env python
+from args import config
 
 from basejumper.jumper import startd
-from basejumper.app import app
+from basejumper.app import configure
 
-startd()
-app.run(debug=True)
+startd(config)
+app = configure(config)
+app.run()

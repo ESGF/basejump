@@ -1,8 +1,13 @@
 from flask import Flask, request, jsonify
 from addons import querykeys
 from mock import datastream
-from db import Transfer, session
+import db
+from models import Transfer
+
 app = Flask(__name__)
+
+database = None
+session = None
 
 
 @app.route("/")
@@ -40,7 +45,6 @@ def queue_job(path=None):
     # Validate arguments
     if path is None:
         raise ValueError("No path provided")
-    print path
     # Authenticate User
     # TODO: Implement
     pass
@@ -65,3 +69,12 @@ def queue_job(path=None):
             s.commit()
 
     return jsonify({"key": key, "progress": "/progress/%s" % key})
+
+
+def configure(config):
+    global database
+    database = db.DB(config.db_config) 
+    global session
+    session = database.session
+    app.config.update(config.app_config)
+    return app

@@ -1,34 +1,29 @@
 import sqlalchemy
-
-# TODO: Use configuration to determine URL
-db_type = "sqlite"
-db_url = "/Users/fries2/basejump.db"
-
-url = ":///".join((db_type, db_url))
-engine = sqlalchemy.create_engine(url)
-
-from models import Base
-
-import os.path
-if not os.path.exists(db_url):
-    Base.metadata.create_all(engine)
-
-# Provide handy objects in the namespace
-from models import Transfer
 from sqlalchemy.orm import sessionmaker
-Session = sessionmaker(bind=engine)
-
+from models import Base
+import os.path
 from contextlib import contextmanager
 
-@contextmanager
-def session():
-    """Provide a transactional scope around a series of operations."""
-    s = Session()
-    try:
-        yield s
-        s.commit()
-    except:
-        s.rollback()
-        raise
-    finally:
-        s.close()
+
+class DB(object):
+    def __init__(self, config):
+        db_type = config["type"]
+        db_url = config["url"]
+        url = ":///".join((db_type, db_url))
+        self.engine = sqlalchemy.create_engine(url)
+        self.Session = sessionmaker(bind=self.engine)
+
+    def initdb(self):
+        Base.metadata.create_all(self.engine)
+
+    @contextmanager
+    def session(self):
+        s = self.Session()
+        try:
+            yield s
+            s.commit()
+        except:
+            s.rollback()
+            raise
+        finally:
+            s.close()
