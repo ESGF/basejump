@@ -1,6 +1,6 @@
 import multiprocessing
 import time
-from mock.datastream import stream_file, file_metadata
+import datastream
 import os
 import logging
 import datetime
@@ -35,33 +35,16 @@ def transfer(t, s):
     t.started = True
     log.info("Starting transfer of %s" % t.path)
     s.commit()
-    
-    # Collect the metadata
-    meta = file_metadata(t.path)
-    size = meta["size"]
-    file_hash = meta["hash"]
 
-    log.info("Metadata:")
-    log.info("Size: %d" % size)
-    log.info("Hash: %s" % file_hash)
-    log.info("Key: %s" % meta["key"])
-
-    cache_path = "/tmp/%s" % meta["key"]
-
+    # TODO: Extract this to a config value
+    cache_path = "/tmp/%s" % t.key
     log.info("Cache File: %s" % cache_path)
 
-    # Stream the file in
-    with open(cache_path, "w+b") as f:
-        for chunk in stream_file(t.path):
-            f.write(chunk)
-            f.flush()
-            os.fsync(f.fileno())
-            written_size = os.fstat(f.fileno()).st_size
-            t.progress = int(float(written_size) / size * 100)
-            log.info("Progress: %d" % t.progress)
-            s.commit()
-        t.progress = 100
+    for percent in datastream.stream_file(t.path, cache_path):
+        log.info("Transfer: %d%%" % percent)
+        t.progress = percent
         s.commit()
+
     log.info("All done with %s" % t.path)
 
 
