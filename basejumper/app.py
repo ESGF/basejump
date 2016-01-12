@@ -1,8 +1,10 @@
 from flask import Flask, request, jsonify
 from addons import querykeys
-from mock import datastream
+import datastream
 import db
 from models import Transfer
+import hmac
+import hashlib
 
 app = Flask(__name__)
 
@@ -29,7 +31,40 @@ def job_progress(key):
         else:
             raise ValueError("Invalid key %s provided" % key)
         s.close()
-    return jsonify({"progress": progress, "key":key})
+    return jsonify({"progress": progress, "key": key})
+
+
+@app.route("/metadata")
+@querykeys
+def file_metadata(path=None, digest=None):
+    digest_error = "Valid digest must be provided to retrieve metadata"
+
+    d = hmac.new(app.config["PUBLISHER_SECRET_KEY"], path, hashlib.sha256).hexdigest()
+
+    if digest is None or len(digest) < len(d):
+        # Going to lengths to prevent timing attacks
+        # Probably excessive.
+        if d != "0" * len(d):
+            digest = "0" * len(d)
+        else:
+            digest = "1" * len(d)
+
+    matches = True
+    fake_switch = True  # Used to prevent timing attacks
+    for i in range(len(digest)):
+        if digest[i] != d[i]:
+            matches = False
+        else:
+            # Make it perform the exact same action regardless of matching
+            fake_switch = False
+
+    if not matches:
+        raise ValueError(digest_error)
+
+    # Now we can actually retrieve the metadata
+    meta = datastream.file_metadata(path)
+
+    return jsonify(meta)
 
 
 @app.route("/queue")
@@ -52,7 +87,7 @@ def queue_job(path=None):
     # TODO: Implement
     pass
     # Check File Exists, retrieve key
-    ### We should use a secret key in generating this key
+    # TODO: We should use a secret key in generating this key
     key = datastream.file_key(path)
     if not key:
         raise ValueError("File %s not found." % (path))
@@ -73,7 +108,7 @@ def queue_job(path=None):
 
 def configure(config):
     global database
-    database = db.DB(config.db_config) 
+    database = db.DB(config.db_config)
     global session
     session = database.session
     app.config.update(config.app_config)

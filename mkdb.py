@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import basejumper.db
-from args import config
+from args import parser, get_config_module
+
+vals = parser.parse_args()
+config = get_config_module(vals.config)
 
 try:
     from config import db_config
