@@ -1,8 +1,8 @@
 from base import BASEClient
 import os
 import random
-import time
 import hashlib
+import datetime
 
 __client__ = BASEClient()
 
@@ -20,8 +20,9 @@ def file_metadata(path):
         checksum_type, checksum = check_result
 
     last_modified = __client__.file_modified(path)
-    # Convert last_modified to ISO 8601
-    last_modified = last_modified.isoformat()
+    # Convert last_modified to epoch time
+    epoch = datetime.datetime.fromtimestamp(0)
+    last_modified = int((last_modified - epoch).total_seconds())
     return {"key": key, "size": __client__.file_size(path), "hash": checksum, "hash_function": checksum_type, "modified": last_modified}
 
 

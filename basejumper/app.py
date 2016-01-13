@@ -4,6 +4,7 @@ import datastream
 import db
 from models import Transfer, File
 import security
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -24,7 +25,7 @@ def job_progress(key):
         Return the progress
     """
     with session() as s:
-        for t in s.query(Transfer).filter(Transfer.key == key):
+        for t in s.query(Transfer).join(Transfer.file).filter(File.key == key).all():
             progress = t.progress
             break
         else:
@@ -55,7 +56,7 @@ def expose_path():
         raise ValueError("Path and Key are required to expose a path")
     path, key = request.form["path"], request.form["key"]
     test_key = datastream.file_key(path)
-
+    print test_key, key, path
     matches = security.constant_time_compare(test_key, key)
 
     if not matches:
@@ -63,13 +64,15 @@ def expose_path():
 
     meta = datastream.file_metadata(path)
     with session() as s:
-        f = s.query(File).filter(File.key == key)
+        f = s.query(File).filter(File.key == key).all()
         if f:
             raise ValueError("This path is already exposed.")
-        f = File(path=path, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=meta["modified"])
+
+        last_modified = datetime.fromtimestamp(meta["modified"])
+        f = File(path=path, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=last_modified)
         s.add(f)
         s.commit()
-    url_path = f.url()
+    url_path = f.queue_url()
     url = request.url_root + url_path
     return jsonify({"queue_url": url})
 
