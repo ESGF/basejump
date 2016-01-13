@@ -1,15 +1,63 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g, session, redirect
 from addons import querykeys
 import datastream
 import db
 from models import Transfer, File
 import security
 from datetime import datetime
+from flask.ext.openid import OpenID
+
 
 app = Flask(__name__)
 
+# TODO: Configurable
+oid = OpenID(app, "/Users/fries2/tmp/", safe_roots=[])
+
 database = None
-session = None
+db_session = None
+
+
+@app.before_request
+def lookup_current_user():
+    g.user = None
+    if "openid" in session:
+        openid = session["openid"]
+        g.user = openid
+    else:
+        print request.path, session
+        if request.path != "/login" and "logging_in" not in session:
+            return redirect("/login")
+
+
+@app.route("/login", methods=["GET", "POST"])
+@oid.loginhandler
+def login():
+    if g.user is not None:
+        return redirect(oid.get_next_url())
+    if request.method == "POST":
+        openid = request.form.get("openid")
+        if openid:
+            session["logging_in"] = True
+            return oid.try_login(openid, ask_for=["email"])
+    return """<form action="/login" method="POST">
+    OpenID:
+    <input type="text" name="openid" />
+    <input type="submit" value="Log In" />
+</form>
+"""
+
+
+@oid.after_login
+def logged_in(resp):
+    session["openid"] = resp.identity_url
+    session.pop("logging_in", None)
+    return redirect(oid.get_next_url())
+
+
+@app.route('/logout')
+def logout_user():
+    session.pop("openid", None)
+    return redirect("/login")
 
 
 @app.route("/")
@@ -24,7 +72,7 @@ def job_progress(key):
         Find the specified job
         Return the progress
     """
-    with session() as s:
+    with db_session() as s:
         for t in s.query(Transfer).join(Transfer.file).filter(File.key == key).all():
             progress = t.progress
             break
@@ -63,7 +111,7 @@ def expose_path():
         raise ValueError("Key is invalid for provided path")
 
     meta = datastream.file_metadata(path)
-    with session() as s:
+    with db_session() as s:
         f = s.query(File).filter(File.key == key).all()
         if f:
             raise ValueError("This path is already exposed.")
@@ -93,7 +141,7 @@ def queue_job(key):
     # TODO: Implement
     pass
 
-    with session() as s:
+    with db_session() as s:
 
         f = s.query(File).filter(File.key == key)
         if not f:
@@ -121,7 +169,7 @@ def queue_job(key):
 def configure(config):
     global database
     database = db.DB(config.db_config)
-    global session
-    session = database.session
+    global db_session
+    db_session = database.session
     app.config.update(config.app_config)
     return app
