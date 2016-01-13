@@ -2,9 +2,8 @@ from flask import Flask, request, jsonify
 from addons import querykeys
 import datastream
 import db
-from models import Transfer
-import hmac
-import hashlib
+from models import Transfer, File
+import security
 
 app = Flask(__name__)
 
@@ -39,24 +38,7 @@ def job_progress(key):
 def file_metadata(path=None, digest=None):
     digest_error = "Valid digest must be provided to retrieve metadata"
 
-    d = hmac.new(app.config["PUBLISHER_SECRET_KEY"], path, hashlib.sha256).hexdigest()
-
-    if digest is None or len(digest) < len(d):
-        # Going to lengths to prevent timing attacks
-        # Probably excessive.
-        if d != "0" * len(d):
-            digest = "0" * len(d)
-        else:
-            digest = "1" * len(d)
-
-    matches = True
-    fake_switch = True  # Used to prevent timing attacks
-    for i in range(len(digest)):
-        if digest[i] != d[i]:
-            matches = False
-        else:
-            # Make it perform the exact same action regardless of matching
-            fake_switch = False
+    matches = security.hmac_compare(app.config["PUBLISHER_SECRET_KEY"], path, digest)
 
     if not matches:
         raise ValueError(digest_error)
@@ -67,9 +49,33 @@ def file_metadata(path=None, digest=None):
     return jsonify(meta)
 
 
-@app.route("/queue")
-@querykeys
-def queue_job(path=None):
+@app.route("/expose", methods=["POST"])
+def expose_path():
+    if "path" not in request.form or "key" not in request.form:
+        raise ValueError("Path and Key are required to expose a path")
+    path, key = request.form["path"], request.form["key"]
+    test_key = datastream.file_key(path)
+
+    matches = security.constant_time_compare(test_key, key)
+
+    if not matches:
+        raise ValueError("Key is invalid for provided path")
+
+    meta = datastream.file_metadata(path)
+    with session() as s:
+        f = s.query(File).filter(File.key == key)
+        if f:
+            raise ValueError("This path is already exposed.")
+        f = File(path=path, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=meta["modified"])
+        s.add(f)
+        s.commit()
+    url_path = f.url()
+    url = request.url_root + url_path
+    return jsonify({"queue_url": url})
+
+
+@app.route("/queue/<key>")
+def queue_job(key):
     """
     /queue?path=/path/to/data/on/server ->
         Authenticate Session w/ESGF
@@ -77,33 +83,36 @@ def queue_job(path=None):
         Check File Exists
         Queue in DB
     """
-    # Validate arguments
-    if path is None:
-        raise ValueError("No path provided")
+    if key is None:
+        raise ValueError("No key provided.")
+
     # Authenticate User
     # TODO: Implement
     pass
-    # Verify Permissions
-    # TODO: Implement
-    pass
-    # Check File Exists, retrieve key
-    # TODO: We should use a secret key in generating this key
-    key = datastream.file_key(path)
-    if not key:
-        raise ValueError("File %s not found." % (path))
 
     with session() as s:
+
+        f = s.query(File).filter(File.key == key)
+        if not f:
+            raise ValueError("No file matching key exposed.")
+
+        f = f[0]
+
+        # Verify Permissions
+        # TODO: Implement
+        pass
+
         # Check if already queued
-        for t in s.query(Transfer).filter(Transfer.path == path):
+        for t in s.query(Transfer).filter(Transfer.file == f):
             # Check if there's an existing transfer for this file
             break
         else:
-            # Queue in DB using path
-            t = Transfer(path=path, key=key, progress=0)
+            # Queue transfer in DB
+            t = Transfer(file=f, progress=0)
             s.add(t)
             s.commit()
 
-    return jsonify({"key": key, "progress": "/progress/%s" % key})
+    return jsonify({"progress": "/progress/%s" % key})
 
 
 def configure(config):

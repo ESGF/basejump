@@ -22,6 +22,7 @@ def poll_db(conf):
         with database.session() as s:
             log = get_log()
             log.info("Checking for unfinished transfers")
+            # At some point will need to tidy this selection process up to see if a transfer is active or not
             t = s.query(Transfer).filter(Transfer.progress < 100).first()
             if t is not None:
                 log.info("Found transfer; restarting.")
@@ -33,19 +34,20 @@ def poll_db(conf):
 def transfer(t, s):
     log = get_log()
     t.started = True
-    log.info("Starting transfer of %s" % t.path)
+    f = t.file
+    log.info("Starting transfer of %s" % f.path)
     s.commit()
 
     # TODO: Extract this to a config value
-    cache_path = "/tmp/%s" % t.key
+    cache_path = "/tmp/%s" % f.key
     log.info("Cache File: %s" % cache_path)
 
-    for percent in datastream.stream_file(t.path, cache_path):
+    for percent in datastream.stream_file(f.path, cache_path):
         log.info("Transfer: %d%%" % percent)
         t.progress = percent
         s.commit()
 
-    log.info("All done with %s" % t.path)
+    log.info("All done with %s" % f.path)
 
 
 def startd(config):
