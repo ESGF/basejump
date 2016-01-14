@@ -6,6 +6,7 @@ from models import Transfer, File
 import security
 from datetime import datetime
 from flask.ext.openid import OpenID
+import urllib
 
 
 app = Flask(__name__)
@@ -24,9 +25,9 @@ def lookup_current_user():
         openid = session["openid"]
         g.user = openid
     else:
-        print request.path, session
+        # Requires
         if request.path != "/login" and "logging_in" not in session:
-            return redirect("/login")
+            return redirect("/login?" + urllib.urlencode({"next": request.path}))
 
 
 @app.route("/login", methods=["GET", "POST"])
