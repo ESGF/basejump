@@ -7,12 +7,12 @@ import security
 from datetime import datetime
 from flask.ext.openid import OpenID
 import urllib
-
+import access_control
 
 app = Flask(__name__)
 
 # TODO: Configurable
-oid = OpenID(app, "/Users/fries2/tmp/", safe_roots=[])
+oid = OpenID(app, app.config.OPENID_STORAGE, safe_roots=[])
 
 database = None
 db_session = None
@@ -126,10 +126,10 @@ def expose_path():
     return jsonify({"queue_url": url})
 
 
-@app.route("/queue/<key>")
-def queue_job(key):
+@app.route("/queue/<group>/<key>")
+def queue_job(group, key):
     """
-    /queue?path=/path/to/data/on/server ->
+    /queue/<group>/<file_key> ->
         Authenticate Session w/ESGF
         Verify Permissions w/ESGF
         Check File Exists
@@ -137,10 +137,6 @@ def queue_job(key):
     """
     if key is None:
         raise ValueError("No key provided.")
-
-    # Authenticate User
-    # TODO: Implement
-    pass
 
     with db_session() as s:
 
@@ -151,8 +147,9 @@ def queue_job(key):
         f = f[0]
 
         # Verify Permissions
-        # TODO: Implement
-        pass
+        if access_control.check_access(g.user) is False:
+            # Should redirect to the registration URL for the relevant group...
+            raise ValueError("User does not have access to the requested file.")
 
         # Check if already queued
         for t in s.query(Transfer).filter(Transfer.file == f):
@@ -173,4 +170,5 @@ def configure(config):
     global db_session
     db_session = database.session
     app.config.update(config.app_config)
+    access_control.configure(config.app_config)
     return app
