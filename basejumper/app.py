@@ -11,8 +11,7 @@ import access_control
 
 app = Flask(__name__)
 
-# TODO: Configurable
-oid = OpenID(app, app.config.OPENID_STORAGE, safe_roots=[])
+oid = OpenID(app)
 
 database = None
 db_session = None
@@ -171,4 +170,5 @@ def configure(config):
     db_session = database.session
     app.config.update(config.app_config)
     access_control.configure(config.app_config)
+
     return app
