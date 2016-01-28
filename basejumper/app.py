@@ -41,13 +41,14 @@ def login():
             session["logging_in"] = True
             return oid.try_login(openid, ask_for=["email"])
     if "openid_error" in session:
+        err = session.pop("openid_error")
         return """
         <div style="color: red;">Error: %s</div>
         <form action="/login" method="POST">
             OpenID:
             <input type="text" name="openid" />
             <input type="submit" value="Log In" />
-        </form>""" % session["openid_error"]
+        </form>""" % err
     return """
             <form action="/login" method="POST">
                 OpenID:
