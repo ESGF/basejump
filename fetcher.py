@@ -1,5 +1,6 @@
 import requests
 import openid.fetchers
+import urlparse
 
 
 class RequestsFetcher(openid.fetchers.HTTPFetcher):
@@ -21,6 +22,8 @@ class RequestsFetcher(openid.fetchers.HTTPFetcher):
         if body is None:
             resp = requests.get(url, headers=headers, verify=self.verify)
         else:
+            # body is passed in as a query string, so we'll extract that
+            body = urlparse.parse_qs(body)
             resp = requests.post(url, data=body, headers=headers, verify=self.verify)
 
         formatted_response = openid.fetchers.HTTPResponse()
