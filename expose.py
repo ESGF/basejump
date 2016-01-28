@@ -5,6 +5,7 @@ import sys
 import requests
 import urllib
 
+parser.add_argument("group", metavar="G", type=str, help="Group to associate file with")
 parser.add_argument("path", metavar="P", type=str, help="Path to expose")
 parser.add_argument("key", metavar="K", type=str, help="Key for path")
 
@@ -36,7 +37,7 @@ except ImportError:
 
 form_data = {"path": path, "key": vals.key}
 
-url = "http://{host}:{port}/expose".format(host=host, port=port)
+url = "http://{host}:{port}/expose/{group}".format(host=host, port=port, group=vals.group)
 print url
 response = requests.post(url, data=form_data)
 print response.text

@@ -26,7 +26,7 @@ def lookup_current_user():
         g.user = openid
     else:
         # Requires
-        if request.path not in login_exempt and "logging_in" not in session:
+        if request.path not in login_exempt and "logging_in" not in session or session["logging_in"]is False:
             return redirect("/login?" + urllib.urlencode({"next": request.path}))
 
 
@@ -40,12 +40,25 @@ def login():
         if openid:
             session["logging_in"] = True
             return oid.try_login(openid, ask_for=["email"])
-    return """<form action="/login" method="POST">
-    OpenID:
-    <input type="text" name="openid" />
-    <input type="submit" value="Log In" />
-</form>
-"""
+    if "openid_error" in session:
+        return """
+        <div style="color: red;">Error: %s</div>
+        <form action="/login" method="POST">
+            OpenID:
+            <input type="text" name="openid" />
+            <input type="submit" value="Log In" />
+        </form>"""
+    return """
+            <form action="/login" method="POST">
+                OpenID:
+                <input type="text" name="openid" />
+                <input type="submit" value="Log In" />
+            </form>"""
+
+@oid.errorhandler
+def on_error(message):
+    del session["logging_in"]
+    return redirect("/login?" + urllib.urlencode({"next": oid.get_next_url()}))
 
 
 @oid.after_login
@@ -99,8 +112,8 @@ def file_metadata(path=None, digest=None):
     return jsonify(meta)
 
 
-@app.route("/expose", methods=["POST"])
-def expose_path():
+@app.route("/expose/<group>", methods=["POST"])
+def expose_path(group):
     if "path" not in request.form or "key" not in request.form:
         raise ValueError("Path and Key are required to expose a path")
     path, key = request.form["path"], request.form["key"]
@@ -117,10 +130,10 @@ def expose_path():
             raise ValueError("This path is already exposed.")
 
         last_modified = datetime.fromtimestamp(meta["modified"])
-        f = File(path=path, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=last_modified)
+        f = File(path=path, group=group, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=last_modified)
         s.add(f)
         s.commit()
-    url_path = f.queue_url()
+        url_path = f.queue_url()
     url = request.url_root + url_path
     return jsonify({"queue_url": url})
 

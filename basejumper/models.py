@@ -32,6 +32,7 @@ class File(Base):
     id = Column(Integer, primary_key=True)
     key = Column(String)
     path = Column(String)
+    group = Column(String)
     modified = Column(DateTime)
     size = Column(Integer)
     checksum = Column(String)
