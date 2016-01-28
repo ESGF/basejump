@@ -55,9 +55,10 @@ def login():
                 <input type="submit" value="Log In" />
             </form>"""
 
+
 @oid.errorhandler
 def on_error(message):
-    del session["logging_in"]
+    session.pop("logging_in", None)
     return redirect("/login?" + urllib.urlencode({"next": oid.get_next_url()}))
 
 
@@ -65,6 +66,7 @@ def on_error(message):
 def logged_in(resp):
     session["openid"] = resp.identity_url
     session.pop("logging_in", None)
+    session.pop("openid_error", None)
     return redirect(oid.get_next_url())
 
 
@@ -152,9 +154,9 @@ def queue_job(group, key):
 
     with db_session() as s:
 
-        f = s.query(File).filter(File.key == key)
+        f = s.query(File).filter(File.key == key and File.group == group)
         if not f:
-            raise ValueError("No file matching key exposed.")
+            raise ValueError("No file matching key/group exposed.")
 
         f = f[0]
 
