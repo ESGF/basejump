@@ -15,6 +15,7 @@ oid = OpenID(app)
 
 database = None
 db_session = None
+login_exempt = ["/login", "/metadata", "/expose"]
 
 
 @app.before_request
@@ -25,7 +26,7 @@ def lookup_current_user():
         g.user = openid
     else:
         # Requires
-        if request.path != "/login" and "logging_in" not in session:
+        if request.path not in login_exempt and "logging_in" not in session:
             return redirect("/login?" + urllib.urlencode({"next": request.path}))
 
 
