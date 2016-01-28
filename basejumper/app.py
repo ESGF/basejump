@@ -26,7 +26,7 @@ def lookup_current_user():
         g.user = openid
     else:
         # Requires
-        if request.path not in login_exempt and ("logging_in" not in session or session["logging_in"]is False):
+        if all([not request.path.startswith(p) for p in login_exempt]) and ("logging_in" not in session or session["logging_in"]is False):
             return redirect("/login?" + urllib.urlencode({"next": request.path}))
 
 
