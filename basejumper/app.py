@@ -105,7 +105,6 @@ def expose_path():
         raise ValueError("Path and Key are required to expose a path")
     path, key = request.form["path"], request.form["key"]
     test_key = datastream.file_key(path)
-    print test_key, key, path
     matches = security.constant_time_compare(test_key, key)
 
     if not matches:
