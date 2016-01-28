@@ -33,6 +33,7 @@ def lookup_current_user():
 @app.route("/login", methods=["GET", "POST"])
 @oid.loginhandler
 def login():
+    print repr(session)
     if g.user is not None:
         return redirect(oid.get_next_url())
     if request.method == "POST":
