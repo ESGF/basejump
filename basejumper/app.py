@@ -47,7 +47,7 @@ def login():
             OpenID:
             <input type="text" name="openid" />
             <input type="submit" value="Log In" />
-        </form>"""
+        </form>""" % session["openid_error"]
     return """
             <form action="/login" method="POST">
                 OpenID:

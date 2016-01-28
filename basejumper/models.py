@@ -39,4 +39,4 @@ class File(Base):
     checksumType = Column(Enum("sha256", "md5", name="checksum_types"))
 
     def queue_url(self):
-        return "/queue" + urlencode({"key": self.key})
+        return "/queue/" + self.group + "?" + urlencode({"key": self.key})
