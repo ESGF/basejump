@@ -27,5 +27,6 @@ class RequestsFetcher(openid.fetchers.HTTPFetcher):
         formatted_response.body = resp.text
         formatted_response.final_url = resp.url
         formatted_response.headers = resp.headers
+        formatted_response.status = resp.status_code
 
         return formatted_response
