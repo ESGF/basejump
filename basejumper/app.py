@@ -8,6 +8,7 @@ from datetime import datetime
 from flask.ext.openid import OpenID
 import access_control
 from filecache import FileCache
+import os
 
 
 app = Flask(__name__)
@@ -19,6 +20,14 @@ db_session = None
 login_exempt = ["/login", "/metadata", "/expose"]
 
 
+def build_url(endpoint, **kwargs):
+    first_part = app.config.get("APPLICATION_ROOT", None)
+    if first_part is not None:
+        return os.path.join("", first_part, url_for(endpoint, **kwargs))
+    else:
+        return url_for(endpoint, **kwargs)
+
+
 @app.before_request
 def lookup_current_user():
     g.user = None
@@ -28,7 +37,7 @@ def lookup_current_user():
         g.user_email = session["email"]
     else:
         if all([not request.path.startswith(p) for p in login_exempt]) and ("logging_in" not in session or session["logging_in"]is False):
-            url = url_for("login", next=request.path, _external=True)
+            url = build_url("login", next=request.path)
             return redirect(url)
 
 
@@ -63,7 +72,7 @@ def login():
 @oid.errorhandler
 def on_error(message):
     session.pop("logging_in", None)
-    url = url_for("login", next=oid.get_next_url(), _external=True)
+    url = build_url("login", next=oid.get_next_url())
     return redirect(url)
 
 
@@ -79,7 +88,7 @@ def logged_in(resp):
 @app.route('/logout')
 def logout_user():
     session.pop("openid", None)
-    url = url_for("login", _external=True)
+    url = build_url("login")
     return redirect(url)
 
 
