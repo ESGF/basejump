@@ -6,7 +6,6 @@ from models import Transfer, File, Notification
 import security
 from datetime import datetime
 from flask.ext.openid import OpenID
-import urllib
 import access_control
 from filecache import FileCache
 
@@ -29,7 +28,7 @@ def lookup_current_user():
         g.user_email = session["email"]
     else:
         if all([not request.path.startswith(p) for p in login_exempt]) and ("logging_in" not in session or session["logging_in"]is False):
-            url = url_for("login", next=request.path)
+            url = url_for("login", next=request.path, _external=True)
             return redirect(url)
 
 
@@ -64,7 +63,7 @@ def login():
 @oid.errorhandler
 def on_error(message):
     session.pop("logging_in", None)
-    url = url_for("login", next=oid.get_next_url())
+    url = url_for("login", next=oid.get_next_url(), _external=True)
     return redirect(url)
 
 
@@ -80,7 +79,7 @@ def logged_in(resp):
 @app.route('/logout')
 def logout_user():
     session.pop("openid", None)
-    url = url_for("login")
+    url = url_for("login", _external=True)
     return redirect(url)
 
 
