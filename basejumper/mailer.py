@@ -32,9 +32,9 @@ class Mailer(object):
         if self.smtp is None:
             log.error("Unable to send email; see earlier in logs for details.")
             return
-
         email = MIMEText(message)
         email["Subject"] = subject
         email["From"] = self.from_address
         email["To"] = ",".join(recipients)
         self.smtp.sendmail("fries2@llnl.gov", recipients, email.as_string())
+        self.smtp.quit()
