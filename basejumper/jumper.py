@@ -69,7 +69,6 @@ def transfer(t, s):
         t.progress = percent
         s.commit()
 
-    s.quit()
     emails = []
     d = datetime.datetime.now()
     for subscriber in t.subscribers:
