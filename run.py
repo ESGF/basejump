@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from args import parser, get_config_module
+from proxy_middleware import ReverseProxied
 
 vals = parser.parse_args()
 config = get_config_module(vals.config)
@@ -23,6 +24,7 @@ try:
     else:
         port = 8000
 
+    app.wsgi_app = ReverseProxied(app.wsgi_app)
     app.run(host, port)
 except ImportError:
     app.run()
