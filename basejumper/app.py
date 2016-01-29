@@ -221,7 +221,7 @@ def download_file(key):
             for notif in transfer.subscribers:
                 if notif.email == g.user_email:
                     # TODO: Only delete the user from the notification list if the download is successful.
-                    notif.delete()
+                    s.delete(notif)
                     break
             s.commit()
             return send_file(filecache.get_file_path(transfer.file.key), as_attachment=True, attachment_filename=transfer.file.file_name())
