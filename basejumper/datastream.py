@@ -28,13 +28,8 @@ def stream_file(path, destination):
     if file_key(path) is None:
         raise ValueError("Path '%s' does not exist" % path)
 
-    # TODO: Fix threading issue preventing streaming filesizes from working
-    yield 0
-    __client__.get_file(path, destination)
-    yield 100
-
-    #for progress, filesize in __client__.stream_file(path, destination):
-    #    yield int(100 * float(progress) / filesize)
+    for progress, filesize in __client__.stream_file(path, destination):
+        yield int(100 * float(progress) / filesize)
 
 
 def file_key(path):
