@@ -13,7 +13,7 @@ def configure(app_config):
     __auth_url__ = app_config["AUTHORIZATION_SERVICE_ENDPOINT"]
 
 
-def check_access(openid):
+def check_access(openid, url=None):
     query = AuthzDecisionQuery()
     query.id = str(uuid4())
     query.version = SAMLVersion(SAMLVersion.VERSION_20)
@@ -28,7 +28,10 @@ def check_access(openid):
     query.subject.nameID.format = "urn:esgf:openid"
     query.subject.nameID.value = openid
 
-    query.resource = request.url
+    if url is None:
+        query.resource = request.url
+    else:
+        query.resource = url
 
     query.actions.append(Action())
     query.actions[-1].namespace = Action.RWEDC_NS_URI

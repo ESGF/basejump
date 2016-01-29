@@ -1,16 +1,18 @@
-from flask import Flask, request, jsonify, g, session, redirect
+from flask import Flask, request, jsonify, g, session, redirect, send_file
 from addons import querykeys
 import datastream
 import db
-from models import Transfer, File
+from models import Transfer, File, Notification
 import security
 from datetime import datetime
 from flask.ext.openid import OpenID
 import urllib
 import access_control
+from filecache import FileCache
+
 
 app = Flask(__name__)
-
+filecache = None
 oid = OpenID(app)
 
 database = None
@@ -24,6 +26,7 @@ def lookup_current_user():
     if "openid" in session:
         openid = session["openid"]
         g.user = openid
+        g.user_email = session["email"]
     else:
         if all([not request.path.startswith(p) for p in login_exempt]) and ("logging_in" not in session or session["logging_in"]is False):
             return redirect("/login?" + urllib.urlencode({"next": request.path}))
@@ -66,6 +69,7 @@ def on_error(message):
 @oid.after_login
 def logged_in(resp):
     session["openid"] = resp.identity_url
+    session["email"] = resp.email
     session.pop("logging_in", None)
     session.pop("openid_error", None)
     return redirect(oid.get_next_url())
@@ -168,6 +172,13 @@ def queue_job(group, key):
 
         # Check if already queued
         for t in s.query(Transfer).filter(Transfer.file == f):
+            for sub in t.subscribers:
+                if sub.email == g.user_email:
+                    break
+            else:
+                notif = Notification(transfer_id=t.id, email=g.user_email)
+                s.add(notif)
+                s.commit()
             # Check if there's an existing transfer for this file
             break
         else:
@@ -175,8 +186,47 @@ def queue_job(group, key):
             t = Transfer(file=f, progress=0)
             s.add(t)
             s.commit()
+            notif = Notification(transfer_id=t.id, email=g.user_email)
+            s.add(notif)
+            s.commit()
 
     return jsonify({"progress": "/progress/%s" % key})
+
+
+@app.route("/download/<key>")
+def download_file(key):
+    """
+    /download/<file_key> ->
+        Authorizes download through ESGF
+        Checks if the user has asked for this file, and removes them from the list of users
+        Transfers file
+    """
+    if key is None:
+        raise ValueError("No key provided")
+
+    with db_session() as s:
+        f = s.query(File).filter(File.key == key)
+        if not f:
+            raise ValueError("File not found.")
+
+        f = f[0]
+        if not access_control.check_access(g.user, url= "/%s/%s" % (f.group, f.key)):
+            raise ValueError("File not found.")
+
+        for transfer in f.transfers:
+            if transfer.progress != 100:
+                continue
+
+            # Check if the user is in the notification list
+            for notif in transfer.subscribers:
+                if notif.email == g.user_email:
+                    # TODO: Only delete the user from the notification list if the download is successful.
+                    notif.delete()
+                    break
+            s.commit()
+            return send_file(filecache.get_file_path(transfer.file.key), as_attachment=True, attachment_filename=transfer.file.file_name())
+
+        raise ValueError("File not ready for download.")
 
 
 def configure(config):
@@ -186,5 +236,6 @@ def configure(config):
     db_session = database.session
     app.config.update(config.app_config)
     access_control.configure(config.app_config)
-
+    global filecache
+    filecache = FileCache(config.cache_config, database.Session())
     return app
