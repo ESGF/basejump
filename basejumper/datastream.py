@@ -1,6 +1,4 @@
 from base import BASEClient
-import os
-import random
 import hashlib
 import datetime
 
