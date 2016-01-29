@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, g, session, redirect, send_file
+from flask import Flask, request, jsonify, g, session, redirect, send_file, url_for
 from addons import querykeys
 import datastream
 import db
@@ -29,7 +29,8 @@ def lookup_current_user():
         g.user_email = session["email"]
     else:
         if all([not request.path.startswith(p) for p in login_exempt]) and ("logging_in" not in session or session["logging_in"]is False):
-            return redirect("/login?" + urllib.urlencode({"next": request.path}))
+            url = url_for("login", next=request.path)
+            return redirect(url)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -63,7 +64,8 @@ def login():
 @oid.errorhandler
 def on_error(message):
     session.pop("logging_in", None)
-    return redirect("/login?" + urllib.urlencode({"next": oid.get_next_url()}))
+    url = url_for("login", next=oid.get_next_url())
+    return redirect(url)
 
 
 @oid.after_login
@@ -78,7 +80,8 @@ def logged_in(resp):
 @app.route('/logout')
 def logout_user():
     session.pop("openid", None)
-    return redirect("/login")
+    url = url_for("login")
+    return redirect(url)
 
 
 @app.route("/")

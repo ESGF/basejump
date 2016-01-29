@@ -86,14 +86,17 @@ def transfer(t, s):
     log.info("All done with %s" % f.path)
 
 
-def startd(config):
+def startd(config, fork=True):
     conf = {"daemon": config.daemon_config,
             "smtp": config.smtp_config,
             "db": config.db_config,
             "log": config.log_config,
             "cache": config.cache_config
             }
-    new_process = multiprocessing.Process(target=poll_db, name="basejumperd", args=[conf])
-    new_process.daemon = True
-    new_process.start()
-    return new_process
+    if fork:
+        new_process = multiprocessing.Process(target=poll_db, name="basejumperd", args=[conf])
+        new_process.daemon = True
+        new_process.start()
+        return new_process
+    else:
+        poll_db(conf)
