@@ -9,7 +9,37 @@ from basejumper.jumper import startd
 import daemon
 from time import sleep
 
-with daemon.DaemonContext():
+dconf = config.daemon_config
+
+import os
+import pwd
+import grp
+import sys
+
+
+user = dconf.get("user", None)
+group = dconf.get("group", None)
+
+if user is None:
+    uid = os.getuid()
+else:
+    try:
+        uid = pwd.getpwnam(user).pw_uid
+    except KeyError:
+        print "Failed to retrieve UID for user '%s'; exiting." % user
+        sys.exit(1)
+
+if group is None:
+    gid = os.getgid()
+else:
+    try:
+        gid = grp.getgrpnam(group).gr_gid
+    except KeyError:
+        print "Failed to retrieve GID for group '%s'; exiting." % group
+        sys.exit(1)
+
+with daemon.DaemonContext(uid=uid, gid=gid):
+
     proc = startd(config)
     while proc.is_alive():
         sleep(60)
