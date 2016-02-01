@@ -28,7 +28,7 @@ def lookup_current_user():
         g.user = openid
         g.user_email = session["email"]
     else:
-        path_elements = os.path.split(request.path)
+        path_elements = request.path.split("/")
         real_elements = []
         for el in path_elements:
             if el == "/" or el == "":

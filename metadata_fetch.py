@@ -37,7 +37,11 @@ digest = hmac.new(key, path, hashlib.sha256).hexdigest()
 
 query = urllib.urlencode({"path": path, "digest": digest})
 
-url = "http://{host}:{port}{root}/metadata?{query}".format(root=root, host=host, port=port, query=query)
+if port != 80:
+    url = "http://{host}:{port}{root}/metadata?{query}".format(root=root, host=host, port=port, query=query)
+else:
+    url = "http://{host}{root}/metadata?{query}".format(root=root, host=host, query=query)
+
 print url
 response = requests.get(url)
 print response.text

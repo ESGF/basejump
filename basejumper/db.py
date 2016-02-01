@@ -9,7 +9,10 @@ class DB(object):
     def __init__(self, config):
         db_type = config["type"]
         db_url = config["url"]
-        url = ":///".join((db_type, db_url))
+        if db_type != "sqlite":
+            url = "://".join((db_type, db_url))
+        else:
+            url = ":///".join((db_type, db_url))
         self.engine = sqlalchemy.create_engine(url)
         self.Session = sessionmaker(bind=self.engine)
 

@@ -38,7 +38,11 @@ except ImportError:
 
 form_data = {"path": path, "key": vals.key}
 
-url = "http://{host}:{port}{root}/expose/{group}".format(root=root, host=host, port=port, group=vals.group)
+if port != 80:
+    url = "http://{host}:{port}{root}/expose/{group}".format(root=root, host=host, port=port, group=vals.group)
+else:
+    url = "http://{host}{root}/expose/{group}".format(root=root, host=host, group=vals.group)
+
 print url
 response = requests.post(url, data=form_data)
 print response.text
