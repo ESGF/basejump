@@ -1,0 +1,18 @@
+#!/usr/bin/env python
+
+from args import parser, get_config_module
+
+vals = parser.parse_args()
+config = get_config_module(vals.config)
+
+from basejumper.jumper import startd
+import daemon
+from time import sleep
+
+with daemon.DaemonContext():
+    proc = startd(config)
+    while proc.is_alive():
+        sleep(60)
+        # Kickstart a new transfer process if one errored out
+        if proc.is_alive() is False:
+            proc = startd(config)
