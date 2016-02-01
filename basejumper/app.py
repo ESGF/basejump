@@ -23,7 +23,7 @@ login_exempt = ["login", "metadata", "expose"]
 def build_url(endpoint, **kwargs):
     first_part = app.config.get("APPLICATION_ROOT", None)
     if first_part is not None:
-        return os.path.join("", first_part, url_for(endpoint, **kwargs))
+        return first_part + url_for(endpoint, **kwargs)
     else:
         return url_for(endpoint, **kwargs)
 
