@@ -29,9 +29,12 @@ def lookup_current_user():
         g.user_email = session["email"]
     else:
         path_elements = os.path.split(request.path)
-        if app.config.get("APPLICATION_ROOT", None):
-            path_elements = path_elements[1:]
-        is_safe_route = path_elements[0] in login_exempt
+        real_elements = []
+        for el in path_elements:
+            if el == "/" or el == "":
+                continue
+            real_elements.append(el)
+        is_safe_route = real_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
             url = url_for("login", next=request.path)
             return redirect(url)
