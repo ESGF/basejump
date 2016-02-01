@@ -166,7 +166,7 @@ def queue_job(group, key):
 
     with db_session() as s:
 
-        f = s.query(File).filter(File.key == key and File.group == group)
+        f = s.query(File).filter(File.key == key and File.group == group).all()
         if not f:
             raise ValueError("No file matching key/group exposed.")
 
@@ -242,6 +242,7 @@ def configure(config):
     global db_session
     db_session = database.session
     app.config.update(config.app_config)
+    print "PUB SECRET KEY", app.config["PUBLISHER_SECRET_KEY"]
     access_control.configure(config.app_config)
     global filecache
     filecache = FileCache(config.cache_config, database.Session())
