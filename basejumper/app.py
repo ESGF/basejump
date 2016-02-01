@@ -20,14 +20,6 @@ db_session = None
 login_exempt = ["login", "metadata", "expose"]
 
 
-def build_url(endpoint, **kwargs):
-    first_part = app.config.get("APPLICATION_ROOT", None)
-    if first_part is not None:
-        return first_part + url_for(endpoint, **kwargs)
-    else:
-        return url_for(endpoint, **kwargs)
-
-
 @app.before_request
 def lookup_current_user():
     g.user = None
@@ -41,7 +33,7 @@ def lookup_current_user():
             path_elements = path_elements[1:]
         is_safe_route = path_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
-            url = build_url("login", next=request.path)
+            url = url_for("login", next=request.path)
             return redirect(url)
 
 
@@ -60,23 +52,23 @@ def login():
         err = session.pop("openid_error")
         return """
         <div style="color: red;">Error: %s</div>
-        <form action="/login" method="POST">
+        <form action="%s" method="POST">
             OpenID:
             <input type="text" name="openid" />
             <input type="submit" value="Log In" />
-        </form>""" % err
-    return """
-            <form action="/login" method="POST">
+        </form>""" % (err, url_for("login"))
+    return """ 
+            <form action="%s" method="POST">
                 OpenID:
                 <input type="text" name="openid" />
                 <input type="submit" value="Log In" />
-            </form>"""
+            </form>""" % (url_for("login"),)
 
 
 @oid.errorhandler
 def on_error(message):
     session.pop("logging_in", None)
-    url = build_url("login", next=oid.get_next_url())
+    url = url_for("login", next=oid.get_next_url())
     return redirect(url)
 
 
@@ -92,7 +84,7 @@ def logged_in(resp):
 @app.route('/logout')
 def logout_user():
     session.pop("openid", None)
-    url = build_url("login")
+    url = url_for("login")
     return redirect(url)
 
 

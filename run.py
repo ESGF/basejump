@@ -24,7 +24,6 @@ try:
     else:
         port = 8000
 
-    #app.wsgi_app = ReverseProxied(app.wsgi_app)
     app.run(host, port)
 except ImportError:
     app.run()
