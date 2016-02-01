@@ -16,6 +16,7 @@ path = vals.path
 try:
     from config import app_config
     key = app_config["PUBLISHER_SECRET_KEY"]
+    root = app_config.get("APPLICATION_ROOT", "")
 except ImportError, KeyError:
     print "Unable to retrieve secret key for metadata request"
     sys.exit(1)
@@ -37,7 +38,7 @@ except ImportError:
 
 form_data = {"path": path, "key": vals.key}
 
-url = "http://{host}:{port}/expose/{group}".format(host=host, port=port, group=vals.group)
+url = "http://{host}:{port}{root}/expose/{group}".format(root=root, host=host, port=port, group=vals.group)
 print url
 response = requests.post(url, data=form_data)
 print response.text
