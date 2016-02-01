@@ -33,7 +33,7 @@ if group is None:
     gid = os.getgid()
 else:
     try:
-        gid = grp.getgrpnam(group).gr_gid
+        gid = grp.getgrnam(group).gr_gid
     except KeyError:
         print "Failed to retrieve GID for group '%s'; exiting." % group
         sys.exit(1)
