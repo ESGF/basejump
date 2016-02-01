@@ -17,7 +17,7 @@ oid = OpenID(app)
 
 database = None
 db_session = None
-login_exempt = ["login", "file_metadata", "expose_path"]
+login_exempt = ["login", "metadata", "expose"]
 
 
 def build_url(endpoint, **kwargs):
@@ -36,12 +36,10 @@ def lookup_current_user():
         g.user = openid
         g.user_email = session["email"]
     else:
+        path_elements = os.path.split(request.path)
         if app.config.get("APPLICATION_ROOT", None):
-            values = os.path.split(request.path)[2:]
-        else:
-            values = os.path.split(request.path)[1:]
-
-        is_safe_route = any([request.path == build_url(r, values=values) for r in login_exempt])
+            path_elements = path_elements[1:]
+        is_safe_route = path_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
             url = build_url("login", next=request.path)
             return redirect(url)
