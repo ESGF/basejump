@@ -24,7 +24,7 @@ def poll_db(conf):
 
     logging.basicConfig(**conf["log"])
 
-    datastream.initclient(conf["base"])
+    datastream.initclient(**conf["base"])
 
     smtp_server = conf["smtp"]["server"]
     fromaddr = conf["smtp"]["from_address"]
