@@ -36,7 +36,7 @@ def lookup_current_user():
             real_elements.append(el)
         is_safe_route = real_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
-            url = url_for("login", next=request.path)
+            url = url_for("login", next=request.url)
             return redirect(url)
 
 
@@ -182,14 +182,17 @@ def queue_job(group, key):
 
         # Check if already queued
         for t in s.query(Transfer).filter(Transfer.file == f):
-            for sub in t.subscribers:
-                if sub.email == g.user_email:
-                    break
+            if t.progress < 100:
+                for sub in t.subscribers:
+                    if sub.email == g.user_email:
+                        break
+                else:
+                    notif = Notification(transfer_id=t.id, email=g.user_email)
+                    s.add(notif)
+                    s.commit()
             else:
-                notif = Notification(transfer_id=t.id, email=g.user_email)
-                s.add(notif)
-                s.commit()
-            # Check if there's an existing transfer for this file
+                # Redirect to download URL
+                return redirect(url_for("download_file", key=key, _external=True))
             break
         else:
             # Queue transfer in DB
