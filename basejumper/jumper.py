@@ -24,6 +24,8 @@ def poll_db(conf):
 
     logging.basicConfig(**conf["log"])
 
+    datastream.initclient(conf["base"])
+
     smtp_server = conf["smtp"]["server"]
     fromaddr = conf["smtp"]["from_address"]
     mailer = Mailer(smtp_server, fromaddr)
@@ -91,7 +93,8 @@ def startd(config, fork=True):
             "smtp": config.smtp_config,
             "db": config.db_config,
             "log": config.log_config,
-            "cache": config.cache_config
+            "cache": config.cache_config,
+            "base": config.base_config
             }
     if fork:
         new_process = multiprocessing.Process(target=poll_db, name="basejumperd", args=[conf])
