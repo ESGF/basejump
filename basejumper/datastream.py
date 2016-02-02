@@ -5,7 +5,7 @@ import datetime
 __client__ = None
 
 
-def initclient(log_path=None, conf_path=None):
+def initclient(log_path="~/msslogs", conf_path="~"):
     global __client__
     if __client__ is None:
         __client__ = BASEClient(log_path, conf_path)
