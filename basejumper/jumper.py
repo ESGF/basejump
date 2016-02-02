@@ -80,7 +80,7 @@ def transfer(t, s):
     message = """Your file transfer of {filename} is complete.\
  Please download it at {download_url} in the next week,\
  otherwise it may be deleted to make room.""".format(filename=f.file_name(),
-                                                     download_url="http://pcmdi11.llnl.gov:5000/download/{key}".format(key=f.key))
+                                                     download_url="http://pcmdi11.llnl.gov/basej/download/{key}".format(key=f.key))
     subject = "HPSS Transfer Complete"
     mailer.send_email(subject, message, emails)
     s.commit()
