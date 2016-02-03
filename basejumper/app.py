@@ -203,7 +203,8 @@ def queue_job(group, key):
             s.add(notif)
             s.commit()
 
-    return jsonify({"progress": "/progress/%s" % key})
+    progress_url = url_for("job_progress", key=key, _external=True)
+    return redirect(progress_url)
 
 
 @app.route("/download/<key>")
