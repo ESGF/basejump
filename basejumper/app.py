@@ -20,13 +20,6 @@ db_session = None
 login_exempt = ["login", "metadata", "expose"]
 
 
-def build_url(endpoint, **kwargs):
-    first_part = app.config.get("APPLICATION_ROOT", None)
-    if first_part is not None:
-        return first_part + url_for(endpoint, **kwargs)
-    else:
-        return url_for(endpoint, **kwargs)
-
 @app.before_request
 def lookup_current_user():
     g.user = None
@@ -35,12 +28,15 @@ def lookup_current_user():
         g.user = openid
         g.user_email = session["email"]
     else:
-        path_elements = os.path.split(request.path)
-        if app.config.get("APPLICATION_ROOT", None):
-            path_elements = path_elements[1:]
-        is_safe_route = path_elements[0] in login_exempt
+        path_elements = request.path.split("/")
+        real_elements = []
+        for el in path_elements:
+            if el == "/" or el == "":
+                continue
+            real_elements.append(el)
+        is_safe_route = real_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
-            url = build_url("login", next=request.path)
+            url = url_for("login", next=request.url)
             return redirect(url)
 
 
@@ -59,23 +55,23 @@ def login():
         err = session.pop("openid_error")
         return """
         <div style="color: red;">Error: %s</div>
-        <form action="/login" method="POST">
+        <form action="%s" method="POST">
             OpenID:
             <input type="text" name="openid" />
             <input type="submit" value="Log In" />
-        </form>""" % err
-    return """
-            <form action="/login" method="POST">
+        </form>""" % (err, url_for("login"))
+    return """ 
+            <form action="%s" method="POST">
                 OpenID:
                 <input type="text" name="openid" />
                 <input type="submit" value="Log In" />
-            </form>"""
+            </form>""" % (url_for("login"),)
 
 
 @oid.errorhandler
 def on_error(message):
     session.pop("logging_in", None)
-    url = build_url("login", next=oid.get_next_url())
+    url = url_for("login", next=oid.get_next_url())
     return redirect(url)
 
 
@@ -91,7 +87,7 @@ def logged_in(resp):
 @app.route('/logout')
 def logout_user():
     session.pop("openid", None)
-    url = build_url("login")
+    url = url_for("login")
     return redirect(url)
 
 
@@ -173,7 +169,7 @@ def queue_job(group, key):
 
     with db_session() as s:
 
-        f = s.query(File).filter(File.key == key and File.group == group)
+        f = s.query(File).filter(File.key == key and File.group == group).all()
         if not f:
             raise ValueError("No file matching key/group exposed.")
 
@@ -186,14 +182,17 @@ def queue_job(group, key):
 
         # Check if already queued
         for t in s.query(Transfer).filter(Transfer.file == f):
-            for sub in t.subscribers:
-                if sub.email == g.user_email:
-                    break
+            if t.progress < 100:
+                for sub in t.subscribers:
+                    if sub.email == g.user_email:
+                        break
+                else:
+                    notif = Notification(transfer_id=t.id, email=g.user_email)
+                    s.add(notif)
+                    s.commit()
             else:
-                notif = Notification(transfer_id=t.id, email=g.user_email)
-                s.add(notif)
-                s.commit()
-            # Check if there's an existing transfer for this file
+                # Redirect to download URL
+                return redirect(url_for("download_file", key=key, _external=True))
             break
         else:
             # Queue transfer in DB
@@ -204,7 +203,8 @@ def queue_job(group, key):
             s.add(notif)
             s.commit()
 
-    return jsonify({"progress": "/progress/%s" % key})
+    progress_url = url_for("job_progress", key=key, _external=True)
+    return redirect(progress_url)
 
 
 @app.route("/download/<key>")
@@ -254,6 +254,7 @@ def configure(config):
     global db_session
     db_session = database.session
     app.config.update(config.app_config)
+    print "PUB SECRET KEY", app.config["PUBLISHER_SECRET_KEY"]
     access_control.configure(config.app_config)
     global filecache
     filecache = FileCache(config.cache_config, database.Session())

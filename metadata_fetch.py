@@ -13,6 +13,7 @@ path = vals.path
 try:
     from config import app_config
     key = app_config["PUBLISHER_SECRET_KEY"]
+    root = app_config.get("APPLICATION_ROOT", "")
 except ImportError, KeyError:
     print "Unable to retrieve secret key for metadata request"
     sys.exit(1)
@@ -36,7 +37,11 @@ digest = hmac.new(key, path, hashlib.sha256).hexdigest()
 
 query = urllib.urlencode({"path": path, "digest": digest})
 
-url = "http://{host}:{port}/metadata?{query}".format(host=host, port=port, query=query)
+if port != 80:
+    url = "http://{host}:{port}{root}/metadata?{query}".format(root=root, host=host, port=port, query=query)
+else:
+    url = "http://{host}{root}/metadata?{query}".format(root=root, host=host, query=query)
+
 print url
 response = requests.get(url)
 print response.text

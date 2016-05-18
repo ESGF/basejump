@@ -2,10 +2,18 @@ from base import BASEClient
 import hashlib
 import datetime
 
-__client__ = BASEClient()
+__client__ = None
+
+
+def initclient(log_path="~/msslogs", conf_path="~"):
+    global __client__
+    if __client__ is None:
+        __client__ = BASEClient(log_path, conf_path)
+    return __client__
 
 
 def file_metadata(path):
+    initclient()
     key = file_key(path)
     if key is None:
         raise ValueError("Invalid File")
@@ -25,6 +33,7 @@ def file_metadata(path):
 
 
 def stream_file(path, destination):
+    initclient()
     if file_key(path) is None:
         raise ValueError("Path '%s' does not exist" % path)
 
@@ -37,6 +46,7 @@ def file_key(path):
     Determines if file exists (returns None if it does not) and generates the
     key used for referring to the file in the DB
     """
+    initclient()
     if path is None:
         return None
     if not __client__.exists(path):

@@ -1,6 +1,7 @@
 from flask import request
 from functools import wraps
 import inspect
+import urlparse
 
 
 def get_keyword_argument_names(func):
@@ -12,9 +13,10 @@ def get_keyword_argument_names(func):
 def querykeys(f):
     # Inspect f to determine keyword args
     keyword_names = get_keyword_argument_names(f)
+
     @wraps(f)
     def wrapped(*args):
-        query_args = request.args
+        query_args = urlparse.parse_qs(request.query_string)
         my_args = {}
         for arg in query_args:
             if arg not in keyword_names:
