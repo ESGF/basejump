@@ -27,7 +27,6 @@ def build_url(endpoint, **kwargs):
     else:
         return url_for(endpoint, **kwargs)
 
-
 @app.before_request
 def lookup_current_user():
     g.user = None
@@ -242,6 +241,11 @@ def download_file(key):
             return send_file(filecache.get_file_path(transfer.file.key), as_attachment=True, attachment_filename=transfer.file.file_name())
 
         raise ValueError("File not ready for download.")
+
+@app.errorhandler(404)
+def page_not_found(err):
+    real_url = url_for("login")
+    return "This route does not exist {}; are you looking for {}?".format(request.url, real_url), 404
 
 
 def configure(config):

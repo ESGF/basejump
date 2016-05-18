@@ -24,6 +24,8 @@ try:
     else:
         port = 8000
 
+    from werkzeug.contrib.fixes import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app)
     #app.wsgi_app = ReverseProxied(app.wsgi_app)
     app.run(host, port)
 except ImportError:
