@@ -8,10 +8,10 @@ config = get_config_module(vals.config)
 from basejumper.jumper import startd
 from basejumper.app import configure
 
-startd(config)
 app = configure(config)
 
 try:
+    startd(config)
     from config import host_config
 
     if "hostname" in host_config:
@@ -28,5 +28,5 @@ try:
     app.wsgi_app = ProxyFix(app.wsgi_app)
     #app.wsgi_app = ReverseProxied(app.wsgi_app)
     app.run(host, port)
-except ImportError:
+except:
     app.run()

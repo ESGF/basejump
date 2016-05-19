@@ -1,5 +1,7 @@
 import hmac
 import hashlib
+import json
+import collections
 
 
 def constant_time_compare(val1, val2):
@@ -15,4 +17,22 @@ def constant_time_compare(val1, val2):
 
 def hmac_compare(key, msg, known):
     h = hmac.new(key, msg, hashlib.sha256)
+    print h.hexdigest(), known
     return constant_time_compare(h.hexdigest(), known)
+
+
+def get_dict_signature(dictionary, key):
+    h = hmac.new(key, digestmod=hashlib.sha256)
+    for k in sorted(dictionary.keys()):
+        h.update(k)
+        h.update(str(dictionary[k]))
+    return h.hexdigest()
+
+
+def check_json_sig(dictionary, key, signature):
+    return constant_time_compare(get_dict_signature(dictionary, key), signature)
+
+
+def sign_path(path, key):
+    h = hmac.new(key, path, hashlib.sha256)
+    return h.hexdigest()

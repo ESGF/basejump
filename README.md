@@ -44,7 +44,7 @@ app_config = {
 }
 
 # No keys currently used
-daemon_config = {	
+daemon_config = {
 }
 ```
 
@@ -73,3 +73,8 @@ import basejumper.app
 import args
 application = basejumper.app.configure(args.config)
 ```
+
+# Installing Dependencies
+
+You *should* be able to just do `pip install -r requirements.txt`. However, if you're on a mac, `m2crypto`, a dependency of `ndg_saml`, requires some manual intervention. See [this page](https://gitlab.com/m2crypto/m2crypto/blob/master/INSTALL.rst#macosx) on how to install `m2crypto`.
+

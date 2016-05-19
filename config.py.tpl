@@ -13,7 +13,7 @@ db_config = {
 # It also supports some custom keys for BASEJumper
 app_config = {
     "DEBUG": True,
-    "PUBLISHER_SECRET_KEY": "",  # Custom to BASEJumper, used for publishing data
+    "BASEJUMP_KEY": "",  # Custom to BASEJumper, used for signing requests between the daemon and the frontend
     "SECRET_KEY": "",
     "USE_X_SENDFILE": True,  # Enable to do low-overhead file transfers when behind apache
     "AUTHORIZATION_SERVICE_ENDPOINT": "https://pcmdi11.llnl.gov/esg-orp/saml/soap/secure/authorizationService.htm"  # Custom to BASEJumper, used for authorizing retrievals

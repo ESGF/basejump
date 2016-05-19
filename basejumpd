@@ -27,7 +27,7 @@ else:
     try:
         pwdinfo = pwd.getpwnam(user)
         uid = pwdinfo.pw_uid
-	homedir = pwdinfo.pw_dir
+        homedir = pwdinfo.pw_dir
     except KeyError:
         print "Failed to retrieve UID for user '%s'; exiting." % user
         sys.exit(1)

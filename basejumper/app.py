@@ -17,7 +17,7 @@ oid = OpenID(app)
 
 database = None
 db_session = None
-login_exempt = ["login", "metadata", "expose"]
+login_exempt = ["", "login", "expose"]
 
 
 @app.before_request
@@ -44,6 +44,11 @@ def lookup_current_user():
 @oid.loginhandler
 def login():
     if g.user is not None:
+        next_url = oid.get_next_url()
+        if next_url.startswith(url_for("login")):
+            return redirect(url_for("main"))
+        else:
+            redirect(next_url)
         return redirect(oid.get_next_url())
     if request.method == "POST":
         openid = request.form.get("openid")
@@ -60,7 +65,7 @@ def login():
             <input type="text" name="openid" />
             <input type="submit" value="Log In" />
         </form>""" % (err, url_for("login"))
-    return """ 
+    return """
             <form action="%s" method="POST">
                 OpenID:
                 <input type="text" name="openid" />
@@ -113,40 +118,30 @@ def job_progress(key):
     return jsonify({"progress": progress, "key": key})
 
 
-@app.route("/metadata")
-@querykeys
-def file_metadata(path=None, digest=None):
-    digest_error = "Valid digest must be provided to retrieve metadata"
-
-    matches = security.hmac_compare(app.config["PUBLISHER_SECRET_KEY"], path, digest)
-
-    if not matches:
-        raise ValueError(digest_error)
-
-    # Now we can actually retrieve the metadata
-    meta = datastream.file_metadata(path)
-
-    return jsonify(meta)
-
-
 @app.route("/expose/<group>", methods=["POST"])
 def expose_path(group):
-    if "path" not in request.form or "key" not in request.form:
-        raise ValueError("Path and Key are required to expose a path")
-    path, key = request.form["path"], request.form["key"]
-    test_key = datastream.file_key(path)
-    matches = security.constant_time_compare(test_key, key)
+    form_keys = ["path", "size", "hash", "hash_function", "modified", "signature"]
+    for key in form_keys:
+        if key not in request.form:
+            raise ValueError("Missing form value %s" % key)
+    path = request.form["path"]
+    signature = request.form["signature"]
 
-    if not matches:
-        raise ValueError("Key is invalid for provided path")
+    # Don't include signature
+    d = {k: request.form[k] for k in form_keys[:-1]}
 
-    meta = datastream.file_metadata(path)
+    if not security.check_json_sig(d, app.config["BASEJUMP_KEY"], signature):
+        raise ValueError("Invalid signature provided.")
+
+    key = security.sign_path(path, app.config["SECRET_KEY"])
+
+    meta = request.form
     with db_session() as s:
         f = s.query(File).filter(File.key == key).all()
         if f:
             raise ValueError("This path is already exposed.")
 
-        last_modified = datetime.fromtimestamp(meta["modified"])
+        last_modified = datetime.fromtimestamp(int(meta["modified"]))
         f = File(path=path, group=group, key=key, size=meta["size"], checksum=meta["hash"], checksumType=meta["hash_function"], modified=last_modified)
         s.add(f)
         s.commit()
@@ -254,7 +249,6 @@ def configure(config):
     global db_session
     db_session = database.session
     app.config.update(config.app_config)
-    print "PUB SECRET KEY", app.config["PUBLISHER_SECRET_KEY"]
     access_control.configure(config.app_config)
     global filecache
     filecache = FileCache(config.cache_config, database.Session())
