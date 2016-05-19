@@ -9,12 +9,13 @@ from flask.ext.openid import OpenID
 import access_control
 from filecache import FileCache
 import os
+from mailer import Mailer
 
 
 app = Flask(__name__)
 filecache = None
 oid = OpenID(app)
-
+mailer = None
 database = None
 db_session = None
 login_exempt = ["", "login", "expose"]
@@ -150,6 +151,105 @@ def expose_path(group):
     return jsonify({"queue_url": url})
 
 
+@app.route("/file/<group>/<key>")
+@querykeys
+def file_info(group, key, signature=None):
+    if signature is None:
+        signature = ""
+
+    sig_key = app.config["BASEJUMP_KEY"]
+    signed_path = security.sign_path("/file/%s/%s" % (group, key), sig_key)
+    if not security.constant_time_compare(signed_path, signature):
+        raise ValueError
+
+    with db_session() as s:
+        f = s.query(File).filter(File.key == key and File.group == group).first()
+        if f is None:
+            raise ValueError("No such file.")
+        return jsonify({"path": f.path})
+
+
+@app.route("/queue")
+@querykeys
+def queued_jobs(timestamp=None, signed_stamp=None):
+    if None in (timestamp, signed_stamp):
+        raise ValueError("No credentials provided.")
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], timestamp, signed_stamp):
+        raise ValueError("Invalid credentials.")
+
+    with db_session() as s:
+        transfers = s.query(Transfer).filter(Transfer.started == False)
+        details = {t.id: t.key for t in transfers.all()}
+        return jsonify(details)
+
+
+@app.route("/transfers/<tid>/start", methods=["POST"])
+def start_transfer(tid):
+    if "signature" not in request.form:
+        raise ValueError("No credentials provided.")
+    signature = request.form["signature"]
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], "/transfers/%s/start" % (tid), signature):
+        raise ValueError("Invalid credentials.")
+    with db_session() as s:
+        transfer = s.query(Transfer).filter(Transfer.id == tid).first()
+        if transfer is None:
+            raise ValueError("No such transfer.")
+        transfer.started = True
+        s.add(transfer)
+        s.commit()
+
+
+@app.route("/transfers/<tid>/progress", methods=["POST"])
+def update_transfer(tid):
+    progress, signature = request.form.get("progress", None), request.form.get("signature", None)
+    if None in (progress, signature):
+        raise ValueError("Need value for progress and signature.")
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], progress, signature):
+        raise ValueError("Invalid credentials.")
+    try:
+        progress = int(progress)
+    except:
+        raise ValueError("Invalid progress value.")
+    with db_session() as s:
+        transfer = s.query(Transfer).filter(Transfer.id == tid and Transfer.started == True).first()
+        if transfer is None:
+            raise ValueError("No such transfer.")
+        transfer.progress = progress
+        s.add(transfer)
+        s.commit()
+
+
+@app.route("/transfers/<tid>/complete", methods=["POST"])
+def complete_transfer(tid):
+    filepath, signature = request.form.get("filepath", None), request.form.get("signature", None)
+    if None in (filepath, signature):
+        raise ValueError("Need value for filepath and signature.")
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], filepath, signature):
+        raise ValueError("Invalid credentials.")
+
+    with db_session() as s:
+        transfer = s.query(Transfer).filter(Transfer.id == tid and Transfer.started == True).first()
+        if transfer is None:
+            raise ValueError("No such transfer.")
+        if not os.path.exists(filepath):
+            raise ValueError("File not found.")
+        transfer.progress = 100
+        s.add(transfer)
+        emails = []
+        d = datetime.datetime.now()
+        for subscriber in transfer.subscribers:
+            emails.append(subscriber.email)
+            subscriber.last_notified = d
+            s.add(subscriber)
+        message = """Your file transfer of {filename} is complete.\
+ Please download it at {download_url} in the next week,\
+ otherwise it may be deleted to make room.""".format(filename=transfer.file.file_name(),
+                                                     download_url=url_for("download_file", key=transfer.file.key, _external=True))
+        subject = "HPSS Transfer Complete"
+        mailer.send_email(subject, message, emails)
+        s.commit()
+
+
 @app.route("/queue/<group>/<key>")
 def queue_job(group, key):
     """
@@ -252,4 +352,6 @@ def configure(config):
     access_control.configure(config.app_config)
     global filecache
     filecache = FileCache(config.cache_config, database.Session())
+    global mailer
+    mailer = Mailer(config.smtp_config["server"], config.smtp_config["from_address"])
     return app
