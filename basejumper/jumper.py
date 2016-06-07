@@ -3,97 +3,122 @@ import time
 import datastream
 import os
 import logging
+import requests
 import datetime
-from filecache import FileCache
-from mailer import Mailer
+import security
+import subprocess
 
-
-filecache = None
-mailer = None
-
+secret = None
+frontend_url = None
+cache_path = None
+transfer_cmd = None
 
 def get_log():
     return logging.getLogger("basejumpd")
 
 
+def get_transfers():
+    stamp = str((datetime.datetime.now() - datetime.datetime(1970, 1, 1)).total_seconds())
+    transfer_response = requests.get(frontend_url + "/queue?timestamp={}&signature={}".format(stamp, security.sign_path(stamp, secret)))
+    if transfer_response.status_code > 299:
+        raise ValueError("Unable to retrieve transfers:" + transfer_response.text)
+    return transfer_response.json()
+
+
+def start_transfer(tid):
+    url_path = "/transfers/{tid}/start".format(tid=tid)
+    signature = security.sign_path(url_path, secret)
+    start_response = requests.post(frontend_url + url_path, data={"signature": signature})
+    if start_response.status_code > 299:
+        raise ValueError("Unable to start transfer:" + start_response.text)
+    return start_response.json()["filepath"]
+
+
+def update_progress(tid, progress):
+    url_path = "/transfers/{tid}/progress".format(tid=tid)
+    signature = security.sign_path(str(progress), secret)
+    prog_response = requests.post(frontend_url + url_path, data={"progress": progress, "signature": signature})
+    if prog_response.status_code > 299:
+        raise ValueError("Unable to update transfer progress:" + prog_response.text)
+
+
+def complete_transfer(tid):
+    url_path = "/transfers/{tid}/complete".format(tid=tid)
+    signature = security.sign_path(tid, secret)
+    complete_response = requests.post(frontend_url + url_path, data={"signature": signature})
+    if complete_response.status_code > 299:
+        raise ValueError("Unable to complete transfer:" + complete_response.text)
+
+
 def poll_db(conf):
-    from db import DB
-    from models import Transfer
-    global filecache
-    global mailer
+    global secret
+    global frontend_url
+    global cache_path
 
     logging.basicConfig(**conf["log"])
 
     datastream.initclient(**conf["base"])
+    frontend_url = conf["daemon"]["BASEJUMP_FRONTEND_URL"]
+    secret = conf["daemon"]["BASEJUMP_KEY"]
+    cache_path = conf["daemon"]["CACHE_DIR"]
+    # An executable command that takes a "source path" and a "target path" to transfer a file
+    transfer_cmd = conf["daemon"]["TRANSFER_CMD"]
 
-    smtp_server = conf["smtp"]["server"]
-    fromaddr = conf["smtp"]["from_address"]
-    mailer = Mailer(smtp_server, fromaddr)
-    database = DB(conf["db"])
-    filecache = FileCache(conf["cache"], database.Session())
-
-    while True:
-        with database.session() as s:
-            log = get_log()
-            log.info("Checking for unfinished transfers")
-            # At some point will need to tidy this selection process up to see if a transfer is active or not
-            transfers = s.query(Transfer).filter(Transfer.progress < 100).all()
-            for t in transfers:
-                log.info("Found transfer of %s" % t.file.key)
-                if t.progress > 0:
-                    log.info("Restarting transfer of %s" % t.file.key)
-                    transfer(t, s)
-                    break
-                else:
-                    log.info("Checking if there's enough space for %s" % t.file.key)
-                    if filecache.make_space_for(t.file.size):
-                        transfer(t, s)
-                        break
-                    else:
-                        log.info("Wasn't able to free up space for %s" % t.file.key)
-            log.info("Resting for a minute")
-            time.sleep(60)
-            log.info("Ready to take another look!")
-
-
-def transfer(t, s):
+    if not os.path.exists(cache_path):
+        os.mkdirs(cache_path)
     log = get_log()
-    t.started = True
-    f = t.file
-    log.info("Starting transfer of %s" % f.path)
-    s.commit()
+    while True:
+        try:
+            transfers = get_transfers()
 
-    cache_path = os.path.join(filecache.path, f.key)
-    log.info("Cache File: %s" % cache_path)
+            for xfer in transfers.values():
+                path = xfer["path"]
+                # At some point will need to tidy this selection process up to see if a transfer is active or not
+                log.info("Found transfer of %s" % path)
+                if transfer(xfer):
+                    log.info("Completed transfer of %s" % path)
+                else:
+                    log.info("Unable to transfer %s; will try later." % path)
+        except Exception as e:
+            log.error("Unable to retrieve transfers.")
+            log.exception(e)
+        log.info("Resting for a minute")
+        time.sleep(60)
+        log.info("Ready to take another look!")
 
-    for percent in datastream.stream_file(f.path, cache_path):
+
+def transfer(xfer):
+    log = get_log()
+    path = xfer["path"]
+    key = xfer["key"]
+    tid = xfer["id"]
+
+    log.info("Starting transfer of %s" % path)
+    try:
+        target_path = start_transfer(key)
+    except ValueError as e:
+        log.exception(e)
+        return False
+
+    file_cache = os.path.join(cache_path, key)
+    log.info("Cache File: %s" % file_cache)
+
+    for percent in datastream.stream_file(path, file_cache):
         log.info("Transfer: %d%%" % percent)
-        t.progress = percent
-        s.commit()
+        update_progress(key, percent)
 
-    emails = []
-    d = datetime.datetime.now()
-    for subscriber in t.subscribers:
-        emails.append(subscriber.email)
-        subscriber.last_notified = d
-        s.add(subscriber)
-    message = """Your file transfer of {filename} is complete.\
- Please download it at {download_url} in the next week,\
- otherwise it may be deleted to make room.""".format(filename=f.file_name(),
-                                                     download_url="http://pcmdi11.llnl.gov/basej/download/{key}".format(key=f.key))
-    subject = "HPSS Transfer Complete"
-    mailer.send_email(subject, message, emails)
-    s.commit()
+    subprocess.call([transfer_cmd, file_cache, target_path])
 
-    log.info("All done with %s" % f.path)
+    complete_transfer(key)
+    os.remove(file_cache)
+
+    log.info("All done with %s" % path)
+    return True
 
 
 def startd(config, fork=True):
     conf = {"daemon": config.daemon_config,
-            "smtp": config.smtp_config,
-            "db": config.db_config,
             "log": config.log_config,
-            "cache": config.cache_config,
             "base": config.base_config
             }
     if fork:

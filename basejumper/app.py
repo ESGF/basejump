@@ -151,24 +151,6 @@ def expose_path(group):
     return jsonify({"queue_url": url})
 
 
-@app.route("/file/<group>/<key>")
-@querykeys
-def file_info(group, key, signature=None):
-    if signature is None:
-        signature = ""
-
-    sig_key = app.config["BASEJUMP_KEY"]
-    signed_path = security.sign_path("/file/%s/%s" % (group, key), sig_key)
-    if not security.constant_time_compare(signed_path, signature):
-        raise ValueError
-
-    with db_session() as s:
-        f = s.query(File).filter(File.key == key and File.group == group).first()
-        if f is None:
-            raise ValueError("No such file.")
-        return jsonify({"path": f.path})
-
-
 @app.route("/queue")
 @querykeys
 def queued_jobs(timestamp=None, signed_stamp=None):
@@ -179,7 +161,7 @@ def queued_jobs(timestamp=None, signed_stamp=None):
 
     with db_session() as s:
         transfers = s.query(Transfer).filter(Transfer.started == False)
-        details = {t.id: t.key for t in transfers.all()}
+        details = [{"id": t.id, "key": t.file.key, "path": t.file.path} for t in transfers.all()]
         return jsonify(details)
 
 
@@ -194,9 +176,18 @@ def start_transfer(tid):
         transfer = s.query(Transfer).filter(Transfer.id == tid).first()
         if transfer is None:
             raise ValueError("No such transfer.")
+
+        f = transfer.file
+        if not filecache.make_space_for(f.size):
+            response = jsonify({"result": "failure"})
+            # "Entity Too Large" error
+            response.status_code = 413
+            response.headers["Retry-After"] = "24"
+            return response
         transfer.started = True
         s.add(transfer)
         s.commit()
+        return jsonify({"result": "success", "filepath": filecache.get_file_path(f.key)})
 
 
 @app.route("/transfers/<tid>/progress", methods=["POST"])
@@ -221,16 +212,17 @@ def update_transfer(tid):
 
 @app.route("/transfers/<tid>/complete", methods=["POST"])
 def complete_transfer(tid):
-    filepath, signature = request.form.get("filepath", None), request.form.get("signature", None)
-    if None in (filepath, signature):
-        raise ValueError("Need value for filepath and signature.")
-    if not security.hmac_compare(app.config["BASEJUMP_KEY"], filepath, signature):
+    signature = request.form.get("signature", None)
+    if signature is None:
+        raise ValueError("Need value for signature.")
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], tid, signature):
         raise ValueError("Invalid credentials.")
 
     with db_session() as s:
         transfer = s.query(Transfer).filter(Transfer.id == tid and Transfer.started == True).first()
         if transfer is None:
             raise ValueError("No such transfer.")
+        filepath = filecache.get_file_path(transfer.file.key)
         if not os.path.exists(filepath):
             raise ValueError("File not found.")
         transfer.progress = 100
