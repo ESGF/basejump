@@ -35,6 +35,8 @@ def lookup_current_user():
             if el == "/" or el == "":
                 continue
             real_elements.append(el)
+        if not real_elements:
+            real_elements = [""]
         is_safe_route = real_elements[0] in login_exempt
         if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
             url = url_for("login", next=request.url)
