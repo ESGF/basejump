@@ -17,7 +17,6 @@ def constant_time_compare(val1, val2):
 
 def hmac_compare(key, msg, known):
     h = hmac.new(key, msg, hashlib.sha256)
-    print h.hexdigest(), known
     return constant_time_compare(h.hexdigest(), known)
 
 
