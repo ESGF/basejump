@@ -20,6 +20,10 @@ for k in "path", "size", "hash", "hash_function", "modified", "signature":
         print "No %s provided." % k
         sys.exit(1)
 
-r = requests.post(config.daemon_config["BASEJUMP_FRONTEND_URL"] + "/expose/" + a.group, data=data, verify=a.cert)
+if a.cert:
+    cert = a.cert[0]
+else:
+    cert = None
+r = requests.post(config.daemon_config["BASEJUMP_FRONTEND_URL"] + "/expose/" + a.group, data=data, verify=cert)
 print r.json()["queue_url"]
 
