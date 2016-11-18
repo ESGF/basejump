@@ -1,13 +1,14 @@
-from flask import Flask, request, jsonify, g, session, redirect, send_file, url_for
+from flask import Flask, request, jsonify, g, session, redirect, send_file, url_for, Response
 from addons import querykeys
 import datastream
 import db
 from models import Transfer, File, Notification
 import security
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask.ext.openid import OpenID
 import access_control
 from filecache import FileCache
+import json
 import os
 from mailer import Mailer
 
@@ -18,7 +19,7 @@ oid = OpenID(app)
 mailer = None
 database = None
 db_session = None
-login_exempt = ["", "login", "expose"]
+login_exempt = ["main", "queue_job", "expose_path", "queued_jobs", "start_transfer", "update_transfer", "complete_transfer", "reset_transfer"]
 
 
 @app.before_request
@@ -29,16 +30,8 @@ def lookup_current_user():
         g.user = openid
         g.user_email = session["email"]
     else:
-        path_elements = request.path.split("/")
-        real_elements = []
-        for el in path_elements:
-            if el == "/" or el == "":
-                continue
-            real_elements.append(el)
-        if not real_elements:
-            real_elements = [""]
-        is_safe_route = real_elements[0] in login_exempt
-        if not is_safe_route and ("logging_in" not in session or session["logging_in"]is False):
+        is_safe_route = request.endpoint in login_exempt
+        if not is_safe_route and ("logging_in" not in session or session["logging_in"] is False):
             url = url_for("login", next=request.url)
             return redirect(url)
 
@@ -158,14 +151,31 @@ def expose_path(group):
 def queued_jobs(timestamp=None, signed_stamp=None):
     if None in (timestamp, signed_stamp):
         raise ValueError("No credentials provided.")
+    if (datetime.now() -  datetime(1970, 1, 1)).total_seconds() - float(timestamp) > 30:
+        raise ValueError("Timestamp too old.")
     if not security.hmac_compare(app.config["BASEJUMP_KEY"], timestamp, signed_stamp):
         raise ValueError("Invalid credentials.")
 
     with db_session() as s:
         transfers = s.query(Transfer).filter(Transfer.started == False)
         details = [{"id": t.id, "key": t.file.key, "path": t.file.path} for t in transfers.all()]
-        return jsonify(details)
+        return Response(json.dumps(details), mimetype="application/json")
 
+@app.route("/transfers/<tid>/reset", methods=["POST"])
+def reset_transfer(tid):
+    if "signature" not in request.form:
+        raise ValueError("No credentials provided.")
+    signature = request.form["signature"]
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], "/transfers/%s/reset" % (tid), signature):
+        raise ValueError("Invalid credentials.")
+    with db_session() as s:
+        transfer = s.query(Transfer).filter(Transfer.id == tid and Transfer.started == True).first()
+        if transfer is None:
+            raise ValueError("No started transfer with id found.")
+        transfer.started = False
+        s.add(transfer)
+        s.commit()
+        return jsonify({"result": "success"})
 
 @app.route("/transfers/<tid>/start", methods=["POST"])
 def start_transfer(tid):
@@ -210,6 +220,7 @@ def update_transfer(tid):
         transfer.progress = progress
         s.add(transfer)
         s.commit()
+    return jsonify(result="success")
 
 
 @app.route("/transfers/<tid>/complete", methods=["POST"])
@@ -217,7 +228,7 @@ def complete_transfer(tid):
     signature = request.form.get("signature", None)
     if signature is None:
         raise ValueError("Need value for signature.")
-    if not security.hmac_compare(app.config["BASEJUMP_KEY"], tid, signature):
+    if not security.hmac_compare(app.config["BASEJUMP_KEY"], "/transfers/%s/complete" % tid, signature):
         raise ValueError("Invalid credentials.")
 
     with db_session() as s:
@@ -230,7 +241,7 @@ def complete_transfer(tid):
         transfer.progress = 100
         s.add(transfer)
         emails = []
-        d = datetime.datetime.now()
+        d = datetime.now()
         for subscriber in transfer.subscribers:
             emails.append(subscriber.email)
             subscriber.last_notified = d
@@ -328,6 +339,7 @@ def download_file(key):
                     break
             s.commit()
             return send_file(filecache.get_file_path(transfer.file.key), as_attachment=True, attachment_filename=transfer.file.file_name())
+            #return send_file(filecache.get_file_path(transfer.file.key), as_attachment=True, attachment_filename=transfer.file.file_name())
 
         raise ValueError("File not ready for download.")
 

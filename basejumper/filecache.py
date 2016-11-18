@@ -68,17 +68,13 @@ class FileCache(object):
         return size <= 0
 
     def get_file_path(self, key):
-        if not os.path.exists(os.path.join(self.path, key)):
+        files = self.session.query(File).all()
+        for f in files:
+            if f.key == key:
+                logger.debug("Found file:" + f.path)
+                break
+        else:
             raise ValueError("No file matching %s found." % key)
 
-        files = self.session.query(File).filter(File.key == key)
-        if not files:
-            raise ValueError("No file matching %s found." % key)
+        return os.path.join(self.path, key)
 
-        f = files[0]
-        for transfer in f.transfers:
-            if transfer.progress != 100:
-                continue
-            return os.path.join(self.path, key)
-
-        raise ValueError("No file matching %s found." % key)

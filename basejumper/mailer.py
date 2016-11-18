@@ -37,4 +37,3 @@ class Mailer(object):
         email["From"] = self.from_address
         email["To"] = ",".join(recipients)
         self.smtp.sendmail("fries2@llnl.gov", recipients, email.as_string())
-        self.smtp.quit()

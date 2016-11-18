@@ -7,7 +7,7 @@ import basejumper
 import sys
 
 parser = args.parser
-parser.add_argument("--cert", nargs=1, help="Certificate Authority to use")
+parser.add_argument("--cert", nargs=1, help="Certificate Authority to use; set to false to ignore SSL errors")
 parser.add_argument("group", help="ESGF group to associate data with")
 a = parser.parse_args()
 config = args.get_config_module(a.config)
@@ -22,8 +22,17 @@ for k in "path", "size", "hash", "hash_function", "modified", "signature":
 
 if a.cert:
     cert = a.cert[0]
+    if cert.lower() == "false":
+         cert = False
 else:
     cert = None
+
+print "Posting to:", config.daemon_config["BASEJUMP_FRONTEND_URL"] + "/expose/" + a.group
 r = requests.post(config.daemon_config["BASEJUMP_FRONTEND_URL"] + "/expose/" + a.group, data=data, verify=cert)
-print r.json()["queue_url"]
+try:
+    r.json()
+    print r.json()["queue_url"]
+except ValueError:
+    print "No JSON found in response:"
+    print r.content
 
