@@ -101,7 +101,7 @@ def get_user_xfers():
     with db_session() as s:
         transfers = []
         for notif in s.query(Notification).filter(Notification.email == g.user_email).all():
-            transfers.append({"file": notif.transfer.file.path, "progress": notif.transfer.progress, "started": notif.transfer.started})
+            transfers.append({"file": notif.transfer.file.path, "progress": notif.transfer.progress, "started": notif.transfer.started, "download_url": url_for("download_file", key=notif.transfer.file.key, _external=True)})
     return jsonify(transfers=transfers)
 
 
