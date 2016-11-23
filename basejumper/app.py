@@ -97,6 +97,15 @@ def main():
     return "BASEJumper Alpha"
 
 
+@app.route("/transfers")
+def get_user_xfers():
+    with db_session() as s:
+        transfers = []
+        for notif in notifs = s.query(Notification).filter(Notification.email == g.user_email).all()
+            transfers.append({"file": notif.transfer.file.path, "progress": notif.transfer.progress, "started": notif.transfer.started})
+    return jsonify(transfers)
+
+
 @app.route("/progress/<key>")
 def job_progress(key):
     """
