@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, g, session, redirect, send_file, url_for, Response
 from addons import querykeys
-import datastream
 import db
 from models import Transfer, File, Notification
 import security
@@ -19,7 +18,7 @@ oid = OpenID(app)
 mailer = None
 database = None
 db_session = None
-login_exempt = ["main", "queue_job", "expose_path", "queued_jobs", "start_transfer", "update_transfer", "complete_transfer", "reset_transfer"]
+login_exempt = ["login", "main", "queue_job", "expose_path", "queued_jobs", "start_transfer", "update_transfer", "complete_transfer", "reset_transfer"]
 
 
 @app.before_request
@@ -103,7 +102,7 @@ def get_user_xfers():
         transfers = []
         for notif in s.query(Notification).filter(Notification.email == g.user_email).all():
             transfers.append({"file": notif.transfer.file.path, "progress": notif.transfer.progress, "started": notif.transfer.started})
-    return jsonify(transfers)
+    return jsonify(transfers=transfers)
 
 
 @app.route("/progress/<key>")
@@ -262,6 +261,7 @@ def complete_transfer(tid):
         subject = "HPSS Transfer Complete"
         mailer.send_email(subject, message, emails)
         s.commit()
+    return "success"
 
 
 @app.route("/queue/<group>/<key>")

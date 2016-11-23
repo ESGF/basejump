@@ -1,2 +1,1 @@
-import jumper
 import app
