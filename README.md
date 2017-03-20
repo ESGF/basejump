@@ -58,21 +58,17 @@ If you have placed your `config.py` file in a custom location, you can pass the 
 
 ## Running
 
-After the configuration is done and the database is created, you can run the app and the daemon using the `run.py` script:
+Once your application is configured, you'll need to run the daemon (`./basejumpd` should hopefully do the trick) and the web server (`./run.py`). Then you should be able to point your browser at wherever it's running.
 
-```
-$ ./run.py
-```
-
-Again, if you have a custom config file location, you can pass it in using `-c` or `--config`.
-
-This script isn't super well-suited to production use; it uses the built-in flask server. For optimal performance, you'll have to manually set up a WSGI script that does something to this effect:
+The `run.py` script isn't super well-suited to production use; it uses the built-in flask server. For optimal performance, you'll have to manually set up a WSGI script that does something to this effect:
 
 ```python
 import basejumper.app
 import args
 application = basejumper.app.configure(args.config)
 ```
+
+and run it from some WSGI-compatible system (mod_wsgi, uwsgi, etc.).
 
 # Installing Dependencies
 
