@@ -19,9 +19,9 @@ Once you have a mapfile in hand (see sample.map) you can do offline publishing
 
 	$ esgpublish --project test --map sample.map --offline --thredds --service hpss --publish
 
-	You should be prompted to enter 
-
+	You should be prompted to enter your esgf user/pass.  On test installations you can use the rootAdmin account with the password chosen when setting up the node.
 
     If there are errors, you may need to break up publishing into separate steps to see what went wrong.  
-(5) Check your CoG site that the urls
+
+(5) Check your CoG site that the urls have been correctly published (search for project:TEST, "show files" in results)
 
