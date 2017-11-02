@@ -1,0 +1,27 @@
+Very Quick Guide to Publishing HPSS Data with Base-Jumper
+
+Note that this guide is a work in progress, please contact the author Sasha Ames sasha@llnl.gov (or look him up on the ESGF Slack channel) if you run into any issues.
+
+(1) FIXME - run scripts to generate mapfile 
+
+Once you have a mapfile in hand (see sample.map) you can do offline publishing
+
+(2) edit /esg/config/esgcet/esg.ini - by default this is root user write, so you may want to change permission.
+
+ -> best practice to publish as a regular unix user not root
+
+(3) source your environment (ESGF v2.5.x or later)  
+
+    $ source /usr/local/conda/bin/activate esgf-pub
+
+(4) attepmt one-step publishing - the key is that you use --offline and --service hpss arguments unlike standard publishing
+	The following assumes the above test mapfile, you'll need to change the specifics for your publication
+
+	$ esgpublish --project test --map sample.map --offline --thredds --service hpss --publish
+
+	You should be prompted to enter 
+
+
+    If there are errors, you may need to break up publishing into separate steps to see what went wrong.  
+(5) Check your CoG site that the urls
+
